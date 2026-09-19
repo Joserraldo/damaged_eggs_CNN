@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "Egg Quality",
+    "slug": "egg-quality",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#F4EBDD"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#F4EBDD"
+      }
+    },
+    "plugins": [
+      "expo-image-picker"
+    ]
+  }
+}

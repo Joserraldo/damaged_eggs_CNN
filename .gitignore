@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# ML artifacts and datasets
+*.keras
+*.h5
+*.zip
+crops/
+dataset/
+roboflow/
+
+# Node / Expo
+node_modules/
+.expo/
+.expo-shared/
+*.log
+npm-debug.log*
+
+# Local editor and OS files
+.vscode/
+.idea/
+.opencode/
+.DS_Store
+Thumbs.db
+NUL
