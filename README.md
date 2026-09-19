@@ -48,15 +48,27 @@ API FastAPI <----- Aplicación Expo Go en el celular
 
 ## Componentes del repositorio
 
-- `clasificador_huevos_colab.ipynb`: notebook educativo para descarga, preprocesamiento, entrenamiento, evaluación y exportación del modelo.
+- `clasificador_huevos_colab.ipynb`: notebook educativo para descarga, preprocesamiento, entrenamiento (MLP vs CNN), evaluación y exportación del modelo. **Flujo completo reconstruido (21 celdas)**.
 - `api/`: servidor FastAPI que carga el modelo y recibe imágenes para clasificación.
 - `mobile/`: aplicación Expo/React Native con cámara, galería, vista previa y resultado.
+- `docs/`: documentación técnica — visión general, arquitectura, dataset, preprocesamiento (incluye filtro **Sobel** creativo), modelos y deploy en VM.
 - `handoff.md`: estado del proyecto, decisiones técnicas y tareas pendientes.
 - `.gitignore`: exclusiones para evitar subir secretos, datasets, modelos pesados y dependencias generadas.
 
+## Creatividad destacada (sustentación)
+
+1. **Filtro Sobel manual** (`cv2.filter2D`) aplicado antes de la CNN para resaltar grietas — puente entre procesamiento clásico de imágenes y deep learning.
+2. **Comparativa justa MLP vs CNN** con los mismos datos, aumentación y callbacks.
+3. **Recall de `crack` como criterio de negocio**: un huevo agrietado que pasa por bueno es el error más caro.
+4. **Predicción visual en test** (10 ejemplos con confianza) + matrices de confusión por clase.
+5. **Contrato de preprocesamiento documentado** y replicado idénticamente en la API.
+6. **GPU T4 explícita** (`nvidia-smi`) y tiempo de entrenamiento medido por modelo.
+
+Detalles en `docs/05-creatividad.md`.
+
 ## Estado actual
 
-La base del MVP está construida: el notebook define el pipeline de entrenamiento, la API tiene el endpoint de predicción y la aplicación móvil está preparada para comunicarse con ella. El siguiente hito es ejecutar el entrenamiento en Colab, obtener el modelo final y validar el flujo completo desde el celular.
+El esqueleto del MVP fue fortalecido: el notebook quedó con flujo completo (21 celdas, listo para ejecutar en Colab), la documentación técnica (`docs/`) cubre arquitectura, dataset, preprocesamiento y creatividad, y la API + app móvil están preparadas para comunicarse. El siguiente hito es ejecutar el entrenamiento en Colab, obtener el modelo final y validar el flujo completo desde el celular.
 
 ## Conectar la app al celular
 

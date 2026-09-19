@@ -1,7 +1,7 @@
 # Handoff - Egg Quality
 
 Fecha: 2026-09-19
-Estado: base de aplicación creada; entrenamiento e integración real del modelo pendientes.
+Estado: esqueleto fortalecido (docs/ técnicos + notebook reparado de inicio a fin); entrenamiento real e integración del modelo pendientes en Colab.
 Última revisión: 2026-09-19
 
 ## Objetivo
@@ -41,28 +41,32 @@ mejor_cnn.keras
 
 ## Lo que ya se hizo
 
+### Documentación técnica (nueva)
+
+Carpeta: `docs/` — 7 documentos que convierten el esqueleto en una base evaluable y con foco en creatividad:
+
+- `00-vision-general.md`: propuesta de valor, problema, usuario y alcance.
+- `01-arquitectura.md`: diagrama Mermaid, flujo de datos y tabla de decisiones con su PORQUÉ.
+- `02-dataset.md`: fuente Roboflow, licencia CC BY 4.0, formato COCO, balance y por qué manda el recall de `crack`.
+- `03-preprocesamiento.md`: bbox crop, 100x100, /255, BGR→RGB y el filtro Sobel manual (`cv2.filter2D`) como feature creativo.
+- `04-modelos.md`: arquitecturas MLP vs CNN, callbacks justificados y criterio de selección.
+- `05-creatividad.md`: guion de 8 features destacables para la sustentación (Sobel, comparativa justa, recall de negocio, curvas, predicción visual...).
+- `06-deploy-vm.md`: notebook → Drive → zip → VM → FastAPI, con el contrato de preprocesamiento.
+
 ### Notebook de entrenamiento
 
-Archivo: `clasificador_huevos_colab.ipynb`
+Archivo: `clasificador_huevos_colab.ipynb` — **reparado el 2026-09-19**.
 
-Incluye la estructura para:
+El notebook original era una plantilla incompleta: las celdas de entrenamiento y evaluación (MLP/CNN) estaban vacías, por lo que el flujo se rompía al llegar a las celdas de resultados (`history_mlp`, `cnn`, `mlp_result`, `cnn_result` no se definían nunca). Se reconstruyó el flujo completo en 21 celdas:
 
-- Configurar Google Colab y verificar GPU.
-- Solicitar la API key de Roboflow con `getpass`.
-- Montar Google Drive.
-- Descargar el proyecto `egg-pisqc` en formato COCO.
-- Leer anotaciones y recortar imágenes por bounding box.
-- Añadir margen, convertir BGR a RGB y redimensionar a `100x100`.
-- Visualizar imágenes originales, recortes, normalización y filtro Sobel.
-- Crear mosaicos y revisar el balance de clases.
-- Cargar los crops con TensorFlow.
-- Normalizar imágenes con `/255`.
-- Aplicar augmentation.
-- Entrenar un MLP y una CNN.
-- Calcular accuracy, recall de `crack`, classification report y matrices de confusión.
-- Elegir el mejor modelo y exportarlo a Drive.
+- Celdas 0-14: configuración, GPU, descarga COCO, preprocesamiento por bbox, mosaicos, balance, carga de datos con `/255` y augmentation.
+- Celda 15: definición de MLP y CNN + entrenamiento con callbacks (EarlyStopping, ReduceLROnPlateau, ModelCheckpoint) y medición de tiempo.
+- Celdas 16-18: evaluación comparativa — curvas lado a lado, classification report, matrices de confusión, selección del mejor modelo por recall de `crack`, 10 predicciones visuales y tabla comparativa.
+- Celdas 19-20: exportación a Drive (`egg_quality_models.zip`) e instrucciones para la VM.
 
-El notebook es una plantilla escrita, pero todavía no se ha ejecutado de principio a fin en Colab.
+Incluye el filtro Sobel manual (`cv2.filter2D`) ANTES de la CNN como demostración de procesamiento clásico (celda 9).
+
+**Sigue pendiente**: ejecutar el notebook de principio a fin en Colab con GPU T4 y la API key real de Roboflow.
 
 ### Frontend móvil
 
