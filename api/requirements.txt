@@ -4,3 +4,7 @@ python-multipart
 tensorflow
 pillow
 numpy
+pytest
+httpx
+pytest
+httpx

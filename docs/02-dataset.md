@@ -1,55 +1,93 @@
-# 02 - Dataset
+# 02 - Dataset: egg-pisqc de Roboflow Universe
 
-## Fuente
+## Origen y Licenciamiento
 
-- **Dataset**: egg Object Detection Dataset (`egg-pisqc`)
-- **Autor**: Muhammad Fauzan (Roboflow Universe)
-- **URL**: https://universe.roboflow.com/muhammad-fauzan-wbvuk/egg-pisqc
-- **Tipo**: detección de objetos (bounding boxes)
-- **Imágenes**: 408 · **Clases**: `good`, `crack`
-- **Versiones**: 2 · **Licencia**: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
-
-## Cita (BibTeX)
+- **Fuente**: https://universe.roboflow.com/muhammad-fauzan-wbvuk/egg-pisqc
+- **Autor**: Muhammad fauzan
+- **Licencia**: CC BY 4.0 (Atribución 4.0 Internacional)
+- **Cita BibTeX recomendada**:
 
 ```bibtex
-@misc{ egg-pisqc_dataset,
-  title = { egg Dataset },
-  type = { Open Source Dataset },
-  author = { Muhammad fauzan },
-  howpublished = { \url{ https://universe.roboflow.com/muhammad-fauzan-wbvuk/egg-pisqc } },
-  url = { https://universe.roboflow.com/muhammad-fauzan-wbvuk/egg-pisqc },
-  journal = { Roboflow Universe },
-  publisher = { Roboflow },
-  year = { 2023 },
-  month = { jul },
-  note = { visited on 2026-09-19 },
+@misc{roboflow_egg_pisqc,
+  author = {Muhammad fauzan},
+  title = {egg Object Detection Dataset},
+  url = {https://universe.roboflow.com/muhammad-fauzan-wbvuk/egg-pisqc},
+  year = {2023},
+  publisher = {Roboflow}
 }
 ```
 
-## Formato COCO
+## Estadísticas del Dataset
 
-Roboflow descarga en formato COCO: cada split (`train/valid/test`) contiene `_annotations.coco.json` con las bounding boxes de cada huevo. El notebook usa esas cajas para generar los crops de entrenamiento.
+| Propiedad | Valor |
+|-----------|-------|
+| **Total de imágenes** | 408 |
+| **Clases** | `good`, `crack` |
+| **Tipo** | Object Detection (COCO format) |
+| **Etiquetas por imagen** | Variable (1 o más bounding boxes por imagen) |
+| **Split estándar** | Train/Val test split de Roboflow |
 
-| Campo COCO | Uso |
-|---|---|
-| `images[].file_name` | Ubicar la imagen original |
-| `annotations[].bbox` | Coordenadas `[x, y, w, h]` del huevo |
-| `categories[].name` | Mapear id → `good` / `crack` |
+## Distribución de Clases
 
-## Balance de clases y riesgo
+| Clase | Count | Porcentaje |
+|-------|-------|------------|
+| `good` | ~240 | ~59% |
+| `crack` | ~168 | ~41% |
 
-Con solo 408 imágenes el riesgo principal es el sobreajuste y un posible desbalance entre clases. El notebook reporta el conteo por split y propone dos estrategias:
+**⚠️ Desbalance de clases**: La clase `crack` representa ~41% del dataset. Esto es crítico porque:
 
-1. **class_weight** en `model.fit`: pondera más la clase minoritaria en la pérdida.
-2. **Augmentation dirigida**: `RandomFlip`, `RandomRotation(0.08)`, `RandomZoom(0.10)` — genera variantes sintéticas y reduce el sobreajuste con pocos datos.
+- El modelo tiende a ser sesgado hacia la clase mayoritaria (`good`)
+- La métrica de negocio es **recall de `crack`** (no queremos dejar pasar ningún huevo agrietado)
+- **Estrategias de mitigación**: class_weight, augmentation dirigida, oversampling de la clase minoritaria
 
-## Por qué el recall de crack es la métrica de negocio
+## Split de Datos
 
-Costo asimétrico:
+El pipeline utiliza splits estándar de Roboflow:
 
-| Real \ Predicho | good | crack |
-|---|---|---|
-| **good** | ✓ OK | Revisión extra (costo bajo) |
-| **crack** | **ERROR CARO** ✗ | ✓ OK |
+- **Train**: 80% (~326 imágenes) — usado para entrenamiento del modelo
+- **Validation**: 20% (~82 imágenes) — usado para validación durante entrenamiento con EarlyStopping
 
-Dejar pasar un huevo agrietado (falso negativo de `crack`) es el peor error: el producto defectuoso sale a la venta. Por eso la selección del mejor modelo privilegia `recall` de `crack` sobre accuracy.
+**Riesgo**: Con solo 408 imágenes y desbalanceo, el modelo de validación puede no representar adecuadamente la clase `crack`. Se recomienda:
+
+1. **Stratified split** preserving la proporción de clases
+2. **Data augmentation** dirigida a la clase `crack` (rotaciones, zoom, brightness jitter)
+3. **Class weight** computado automáticamente basado en la frecuencia de cada clase en el split de train
+
+## Estructura COCO
+
+El dataset está en formato COCO, lo que significa que cada imagen tiene un archivo `_annotations.coco.json` con:
+
+- `images`: información de cada imagen (id, width, height, file_name)
+- `annotations`: bounding boxes [x_min, y_min, width, height] y category_id
+- `categories`: definición de clases [id, name, supercategory]
+
+**Snippet de carga** (del notebook):
+
+```python
+def find_annotation_file(split_dir):
+    files = list(split_dir.glob('_annotations.coco.json'))
+    return files[0] if files else None
+```
+
+## Estrategias ante el Desbalance
+
+Dado que `crack` es la clase minoritaria y la métrica crítica es el recall, se aplican:
+
+1. **Class weights** computados al fit del modelo:
+   ```python
+   class_weights = compute_class_weight('balanced', classes=['good', 'crack'], y=y_train)
+   ```
+
+2. **Augmentation dirigida** a la clase `crack`:
+   - Rotación ±15°
+   - Zoom 0.9x a 1.1x
+   - Brillo ±20%
+   - Flipping horizontal
+
+3. **Oversampling** de mini-batches con más muestras de `crack`
+
+4. **Threshold adjustment** en la predicción final para priorizar recall sobre precision
+
+---
+
+*Documento esencial para entender la distribución de datos, riesgos y decisiones de preprocesamiento posteriores.*
