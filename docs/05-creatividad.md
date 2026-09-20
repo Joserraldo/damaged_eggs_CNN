@@ -33,3 +33,19 @@ El profe valora **creatividad**, uso de GPU de Colab y documentación del **PORQ
 ## 8. ⭐ GPU T4 explícita y tiempo medido
 **Qué**: `!nvidia-smi` + `time.time()` por modelo y comparativa de duración.
 **Qué demuestra**: uso real de la GPU de Colab y justificación del diseño (100x100 cabe en T4; 2-4h presupuestadas).
+
+## 9. ⭐ Transfer learning con MobileNetV2 (3er modelo)
+**Qué**: tercera arquitectura con pesos congelados de ImageNet y solo la cabeza densa entrenada; la Rescaling interna mantiene el contrato de datos 0-1.
+**Qué demuestra**: transfer learning (tema avanzado) y decisión de producción con datasets pequeños — MLP vs CNN vs transfer en una sola tabla.
+
+## 10. ⭐ Augmentation aplicada SOLO en train (y funcionando)
+**Qué**: rotación, flip y zoom inyectadas en el pipeline de train (nunca en valid/test), con el porqué: crear variaciones de un dataset de 408 imágenes sin contaminar la evaluación.
+**Qué demuestra**: entendemos qué hace la augmentación y DÓNDE pertenece — error típico de principiante evitar.
+
+## 11. ⭐ Cámara en vivo en la app (preview continuo + captura manual)
+**Qué**: modo "En vivo" con `expo-camera`: preview de video continuo y el usuario captura el fotograma cuando el huevo está bien encuadrado; además foto y galería.
+**Qué demuestra**: integración nativa de cámara continua (no solo un picker), UX de control de calidad tipo "línea de inspección".
+
+## 12. ⭐ Deploy en AWS con IP elástica
+**Qué**: EC2 (Ubuntu, t3.medium) + Elastic IP + security group con puerto 8000 + servicio systemd que sobrevive reinicios.
+**Qué demuestra**: ciclo completo real: Colab GPU → modelo en Drive → VM en la nube → app del celular consumiendo la API por IP pública. Detalles en `docs/06-deploy-vm.md`.

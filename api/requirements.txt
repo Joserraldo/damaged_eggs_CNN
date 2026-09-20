@@ -6,5 +6,3 @@ pillow
 numpy
 pytest
 httpx
-pytest
-httpx

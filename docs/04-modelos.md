@@ -1,6 +1,6 @@
 # 04 - Modelos
 
-Se entrenan dos arquitecturas con los MISMOS datos, aumentación y callbacks para una comparación justa.
+Se entrenan tres arquitecturas con los MISMOS datos, aumentación y callbacks para una comparación justa: MLP (línea base densa), CNN desde cero y MobileNetV2 con transfer learning.
 
 ## Callbacks compartidos (PORQUÉ de cada uno)
 
@@ -53,13 +53,35 @@ cnn = tf.keras.Sequential([
 
 **Por qué**: las convoluciones detectan patrones locales (bordes = grietas) reutilizando filtros con pocos parámetros (Cuaderno 7, CIFAR-10). MaxPooling reduce resolución conservando señales dominantes. Dropout(0.5) apaga unidades al azar → regulariza con datos escasos.
 
+## MobileNetV2 (transfer learning)
+
+```python
+base_mobilenet = tf.keras.applications.MobileNetV2(
+    include_top=False, weights='imagenet', input_shape=(100, 100, 3))
+base_mobilenet.trainable = False  # transfer learning: pesos congelados
+
+mobilenet = tf.keras.Sequential([
+    tf.keras.Input(shape=(100, 100, 3)),
+    tf.keras.layers.Rescaling(1.0 / 127.5, offset=-1.0),  # [0,1] -> [-1,1] (prepro MobileNetV2)
+    base_mobilenet,
+    tf.keras.layers.GlobalAveragePooling2D(),
+    tf.keras.layers.Dense(64, activation='relu'),
+    tf.keras.layers.Dropout(0.4),
+    tf.keras.layers.Dense(2, activation='softmax'),
+], name='mobilenetv2')
+```
+
+**Por qué**: con ~408 imágenes, reutilizar pesos entrenados en ImageNet (millones de fotos) casi siempre supera a una CNN desde cero. Se congela el extractor de features y solo se entrena la cabeza densa. La capa `Rescaling` interna convierte [0,1] → [-1,1] **dentro del modelo**, así el contrato de datos (0-1) queda igual para los 3 modelos y la API no necesita cambios. Es la práctica estándar de producción para datasets pequeños.
+
+**Nota sobre YOLO**: YOLO es para *detección* (encontrar dónde está el huevo), no clasificación. Este proyecto es un clasificador; la vía de YOLO queda como mejora futura para auto-detectar y recortar el huevo antes de clasificar.
+
 ## Comparación y selección
 
 | Métrica | Rol |
 |---|---|
 | accuracy | Visión general |
 | **recall `crack`** | **Criterio de selección** (error caro = huevo roto que pasa por bueno) |
-| parámetros | Muestra por qué la CNN escala mejor |
+| parámetros | Muestra por qué la CNN/MobileNet escalan mejor que el MLP |
 | tiempo (s) | Justifica el uso de GPU T4 y el diseño |
 
-El notebook genera: curvas loss/accuracy lado a lado, classification report, matrices de confusión, 10 predicciones visuales y una tabla comparativa final con el ganador justificado.
+El notebook genera: curvas loss/accuracy de los 3 modelos, classification report, matrices de confusión, 10 predicciones visuales y una tabla comparativa final con el ganador justificado (el que maximice el recall de `crack`).

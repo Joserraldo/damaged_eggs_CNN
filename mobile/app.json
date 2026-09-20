@@ -17,7 +17,13 @@
       }
     },
     "plugins": [
-      "expo-image-picker"
+      "expo-image-picker",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Egg Quality usa la cámara para revisar el estado de los huevos."
+        }
+      ]
     ]
   }
 }

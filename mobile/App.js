@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator, Image, Modal, Pressable, SafeAreaView, ScrollView,
   StatusBar, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -25,6 +26,10 @@ export default function App() {
   const [history, setHistory] = useState([]);
   const [historyOpen, setHistoryOpen] = useState(false);
 
+  const [liveOpen, setLiveOpen] = useState(false);
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const cameraRef = useRef(null);
+
   // Cargar URL guardada e historial al iniciar.
   useEffect(() => {
     (async () => {
@@ -43,6 +48,16 @@ export default function App() {
       ? await ImagePicker.launchCameraAsync(options)
       : await ImagePicker.launchImageLibraryAsync(options);
     if (!response.canceled) setImage(response.assets[0]);
+  }
+
+  // Captura el fotograma actual del preview en vivo y lo deja listo para analizar.
+  async function takeLivePhoto(cameraRef) {
+    setError(null);
+    setResult(null);
+    if (!cameraRef.current) return;
+    const photo = await cameraRef.current.takePictureAsync({ quality: 0.9 });
+    setImage({ uri: photo.uri, width: photo.width, height: photo.height });
+    setLiveOpen(false);
   }
 
   async function saveApiUrl() {
@@ -118,7 +133,20 @@ export default function App() {
         </View>
 
         <View style={styles.actions}>
-          <Pressable style={styles.secondaryButton} onPress={() => chooseImage('camera')}><Ionicons name="camera-outline" size={20} color="#29352D" /><Text style={styles.secondaryText}>Cámara</Text></Pressable>
+          <Pressable
+            style={[styles.secondaryButton, styles.liveButton]}
+            onPress={async () => {
+              if (!cameraPermission?.granted) {
+                const response = await requestCameraPermission();
+                if (!response.granted) { setError('Se necesita permiso de cámara para el modo en vivo.'); return; }
+              }
+              setLiveOpen(true);
+            }}
+          >
+            <Ionicons name="videocam-outline" size={20} color="#B56A45" />
+            <Text style={[styles.secondaryText, styles.liveText]}>En vivo</Text>
+          </Pressable>
+          <Pressable style={styles.secondaryButton} onPress={() => chooseImage('camera')}><Ionicons name="camera-outline" size={20} color="#29352D" /><Text style={styles.secondaryText}>Foto</Text></Pressable>
           <Pressable style={styles.secondaryButton} onPress={() => chooseImage('library')}><Ionicons name="images-outline" size={20} color="#29352D" /><Text style={styles.secondaryText}>Galería</Text></Pressable>
         </View>
 
@@ -181,6 +209,26 @@ export default function App() {
           </View>
         </Modal>
 
+        {/* Cámara en vivo: preview continuo + captura manual del fotograma actual */}
+        <Modal visible={liveOpen} animationType="slide">
+          <View style={styles.liveContainer}>
+            <CameraView ref={cameraRef} style={styles.camera} facing="back">
+              <View style={styles.liveTop}>
+                <Text style={styles.liveHint}>Encuadra UN huevo y toca el botón para capturar</Text>
+              </View>
+              <View style={styles.liveControls}>
+                <Pressable style={styles.liveClose} onPress={() => setLiveOpen(false)}>
+                  <Ionicons name="close" size={26} color="#F4EBDD" />
+                </Pressable>
+                <Pressable style={styles.captureButton} onPress={() => takeLivePhoto(cameraRef)}>
+                  <View style={styles.captureInner} />
+                </Pressable>
+                <View style={styles.liveClose} />
+              </View>
+            </CameraView>
+          </View>
+        </Modal>
+
         <Text style={styles.footer}>API: {apiUrl}</Text>
       </ScrollView>
     </SafeAreaView>
@@ -231,4 +279,14 @@ const styles = StyleSheet.create({
   historyText: { color: '#29352D', fontSize: 14, fontWeight: '700', flex: 1 },
   historyTime: { color: '#7C817A', fontSize: 12 },
   footer: { marginTop: 20, color: '#9A9F98', fontSize: 12, textAlign: 'center' },
+  liveButton: { backgroundColor: '#F1E0CC', borderWidth: 1, borderColor: '#E0C4A8' },
+  liveText: { color: '#B56A45' },
+  liveContainer: { flex: 1, backgroundColor: '#29352D' },
+  camera: { flex: 1, justifyContent: 'space-between' },
+  liveTop: { paddingTop: 56, paddingHorizontal: 24, alignItems: 'center' },
+  liveHint: { color: '#F4EBDD', fontSize: 14, fontWeight: '700', backgroundColor: 'rgba(41,53,45,0.55)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, overflow: 'hidden', textAlign: 'center' },
+  liveControls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 36, paddingBottom: 40 },
+  liveClose: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(41,53,45,0.55)', alignItems: 'center', justifyContent: 'center' },
+  captureButton: { width: 76, height: 76, borderRadius: 38, backgroundColor: 'rgba(244,235,221,0.35)', alignItems: 'center', justifyContent: 'center' },
+  captureInner: { width: 58, height: 58, borderRadius: 29, backgroundColor: '#F4EBDD' },
 });
