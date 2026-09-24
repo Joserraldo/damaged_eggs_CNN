@@ -12,6 +12,10 @@ env/
 .env.*
 !.env.example
 
+# SSH keys
+*.pem
+*.ppk
+
 # ML artifacts and datasets
 *.keras
 *.h5

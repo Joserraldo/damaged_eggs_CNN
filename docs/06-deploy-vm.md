@@ -2,6 +2,26 @@
 
 Guía completa para llevar el modelo entrenado en Colab hasta una VM EC2 de AWS, y dejar la API visible desde el celular mediante la **IP elástica** y el **puerto 8000 abierto**.
 
+> **IP elástica del proyecto: `54.227.194.211`** (EC2 `egg-quality-api`, Ubuntu 22.04). La app se conecta a `http://54.227.194.211:8000`. No depende de tu red: es pública y el puerto 8000 ya está abierto.
+
+## 0. Deploy en un comando (scripts listos)
+
+Hay dos scripts que hacen todo el flujo (unzip, venv, deps, systemd y health check):
+
+1. Desde tu PC (PowerShell), con la llave `.pem` y el zip del modelo:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\deploy_local.ps1 -Pem C:\ruta\llave.pem -Zip .\egg_quality_models.zip -ModelFile mejor_cnn.keras
+```
+
+2. O ya dentro de la VM, el remoto directo:
+
+```bash
+bash deploy_remote.sh /home/ubuntu/egg_quality_models.zip mejor_cnn.keras
+```
+
+`-ModelFile` / segundo argumento = el `.keras` ganador dentro del zip (ver sección "Qué modelo desplegar" abajo). El resto de apartados documentan los pasos manuales por si prefieres hacerlos a mano.
+
 ## 1. En Colab (el notebook lo hace solo)
 
 - Guarda el mejor modelo en `/content/mejor_*.keras` (el ganador entre MLP, CNN y MobileNetV2).
@@ -105,7 +125,7 @@ Si no responde: revisa que el security group tenga el **Custom TCP 8000 abierto*
 En `mobile/App.js` (o desde el botón ⚙️ Configurar API de la app) usa:
 
 ```
-http://54.210.100.25:8000
+http://54.227.194.211:8000
 ```
 
 No se necesita HTTPS ni misma red: la IP elástica es pública y el puerto está abierto. Probar con `GET /health` desde el celular es la comprobación más rápida.
@@ -125,3 +145,15 @@ No se necesita HTTPS ni misma red: la IP elástica es pública y el puerto está
 | Formato API | multipart/form-data, campo `file` (jpg/png/webp) |
 
 Regla crítica: el preprocesamiento de la API debe ser **idéntico** al de entrenamiento. Si la imagen llega a otra resolución o sin normalizar, la predicción no vale. La app móvil muestra instrucciones de encuadre para que el huevo llegue bien centrado (el modelo fue entrenado con crops de bbox).
+
+## 11. Qué modelo desplegar (importante para la demo)
+
+Resultados reales en test (127 huevos) del notebook:
+
+| Modelo | Accuracy | Recall crack | Precision crack | Recall good |
+|---|---|---|---|---|
+| MLP | 0.68 | 0.50 | 0.76 | 0.85 |
+| CNN (`mejor_cnn.keras`) | 0.64 | 0.90 | 0.58 | 0.38 |
+| **MobileNetV2** | **0.92** | 0.89 | 0.95 | 0.95 |
+
+La CNN "ganó" por el criterio de mayor recall de `crack`, pero está degenerada: predice `crack` casi siempre (solo acierta 38% de los buenos y sus alertas de crack son 42% falsas). Para la demo el mejor comportamiento lo da **MobileNetV2** (92% accuracy y recall de crack casi igual: 1 huevo de diferencia en 62). Para exportarlo hay que cambiar el criterio de la celda 22 del notebook (p. ej. elegir por accuracy entre modelos con recall_crack ≥ 0.85) y volver a ejecutarlo; el zip quedará con `mejor_mobilenet.keras` y el deploy se hace con `-ModelFile mejor_mobilenet.keras`.

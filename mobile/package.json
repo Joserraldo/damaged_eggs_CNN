@@ -9,12 +9,15 @@
     "ios": "expo start --ios"
   },
   "dependencies": {
-    "@expo/vector-icons": "^14.0.0",
-    "@react-native-async-storage/async-storage": "^1.23.1",
-    "expo": "^52.0.0",
-    "expo-camera": "^16.0.0",
-    "expo-image-picker": "^16.0.0",
-    "react": "18.3.1",
-    "react-native": "0.76.5"
+    "@expo/vector-icons": "^15.0.2",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "expo": "~57.0.24",
+    "expo-asset": "~57.0.18",
+    "expo-camera": "~57.0.5",
+    "expo-font": "~57.0.4",
+    "expo-image-picker": "~57.0.19",
+    "expo-splash-screen": "~57.0.9",
+    "react": "19.2.3",
+    "react-native": "0.86.3"
   }
 }

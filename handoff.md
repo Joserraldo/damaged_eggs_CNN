@@ -2,7 +2,68 @@
 
 Fecha: 2026-09-19
 Estado: listo para ejecutar en Colab (notebook con pip install, augmentation aplicada y transfer learning) + deploy AWS documentado + app con cámara en vivo; quedan: ejecutar el entrenamiento real y subir el modelo a AWS.
-Última revisión: 2026-09-19
+Última revisión: 2026-09-23
+
+> **Actualización 2026-09-23**: el notebook ya se ejecutó completo en Colab (resultados en Sección 3). La **EC2 ya está creada** y su **IP elástica es `54.227.194.211`**. Queda: decidir el modelo a desplegar (recomendado MobileNetV2, ver abajo) y lanzar el deploy con `scripts/deploy_local.ps1`.
+
+### 🔴 PENDIENTE PRIORITARIO — NUEVO INTENTO DE MODELO (2026-09-23, por la noche)
+
+**Problema detectado en producción**: la app mandó un huevo "super roto" y el modelo respondió `good` (falso negativo). Tras investigar, se identificó la causa raíz:
+
+1. **Desajuste de preprocesamiento (causa principal)**: el notebook entrena con **crops** (recorta el huevo con el bbox del dataset), pero la app manda la **foto completa** sin recortar. La API (`api/main.py`) solo hace `resize(100x100)` de la foto entera. El modelo nunca vio huevos en fotos completas, así que degrada con fotos reales del celular.
+2. **Dataset muy pequeño y de una sola fuente**: solo 1238 crops de 408 imágenes (proyecto `egg-pisqc`), poca variedad de cámara/fondo/iluminación.
+
+**Solución creada**: `scripts/reentrenar_huevos_colab.py` (listo para Colab con GPU):
+- Descarga y combina **8 datasets de Roboflow** (el original `egg-pisqc` + 7 más: `egg-egg-1hseh`, `egg-a2ssv`, `egg-egg-12`, `cracked-eggs`, `egg-dqnud`, `egg-egg-liushuixian`, `egg-4cbmo`).
+- Entrena con **FOTOS COMPLETAS** (no crops) para coincidir con lo que manda la app.
+- Etiqueta cada imagen completa solo si todos los huevos anotados comparten la misma clase (evita etiquetas ambiguas).
+- Divide por imagen original (sin data leakage), entrena CNN + MobileNetV2 (mismas arquitecturas del notebook) y exporta el mejor por **recall de crack ≥ 0.85**.
+- Guarda el `.keras` en Drive para descargarlo y desplegarlo en AWS.
+
+**Verificado**: la API **no requiere cambios** — el contrato de datos (foto completa, 0-1, 100x100) ya coincide con el nuevo entrenamiento. La lógica de clasificación de clases y la sintaxis del script fueron probadas (tests OK).
+
+**PASOS PENDIENTES (mañana o cuando toque)**:
+1. Abrir `scripts/reentrenar_huevos_colab.py` en Colab (Runtime → GPU T4) y ejecutarlo.
+2. Ingresar la API key de Roboflow (https://app.roboflow.com/settings/api) cuando la pida.
+3. Nota: algunos datasets pueden requerir login/aceptar licencia en Roboflow para descargarse; el script los saltea sin romper el resto. Si queda muy poco data, ajustar la lista de datasets o versiones.
+4. Descargar el `mejor_mobilenet.keras` (o el que elija) de Drive.
+5. Desplegarlo en AWS con el flujo habitual (`deploy_local.ps1` / subir `.keras` a la VM).
+6. Re-probar en el celular con un huevo roto real para confirmar la mejora.
+
+**Cambios de este intento**:
+- `scripts/reentrenar_huevos_colab.py` — NUEVO (script de reentrenamiento con fotos completas + datasets múltiples).
+- `README.md` — documentado el script y corregida la sección de limitaciones (fotos completas en lugar de crops).
+- `api/main.py` — sin cambios (ya compatible).
+- `mobile/App.js` — cambio previo (XMLHttpRequest para el multipart), ya probado.
+
+
+
+### Registro de ejecución 2026-09-23 (deploy + Expo)
+
+1. **Notebook re-ejecutado en Colab** con el criterio corregido (celda 22: máxima accuracy entre modelos con recall_crack ≥ 0.85). Ganador: **MobileNetV2** (accuracy 0.921, recall_crack 0.887). El zip de Drive quedó con `mejor_mobilenet.keras` (10.6 MB) además del `mejor_cnn.keras` previo.
+2. **Deploy a la EC2** (`54.227.194.211`) con `scripts/deploy_local.ps1` + `deploy_remote.sh`:
+   - Empezó como **t3.medium según docs, pero la instancia real es 1.9 GB RAM y ~7 GB disco** con apenas Python 3.14 (TensorFlow no tiene wheel para 3.14). Solución: `uv` baja un **CPython 3.12.14** aislado y crea `.venv` con `tensorflow==2.21.0`.
+   - Bug encontrado en v1 de `deploy_remote.sh`: `unzip -q "$ZIP" -o -d dir` → `unzip` trata `-o`/`-d` como archivos (deben ir antes del nombre del zip). Corregido a `unzip -q -o -d "$MODELS_DIR" "$ZIP"`.
+   - Servicio `egg-quality` (systemd) activo sirviendo `mejor_mobilenet.keras`. Verificado vía localhost:
+     - `GET /health` → `{"status":"ok","model_loaded":true,...}`
+     - `GET /model-info` → `input_shape [100,100,3]`, clases `good`/`crack`
+     - `POST /predict` imagen PNG válida → `200 {"label":"good","confidence":0.924,...}` (imagen sintética)
+     - `POST /predict` archivo no-imagen → `400` con detalle
+   - **PENDIENTE (bloqueante para el celular)**: el puerto 8000 no responde desde fuera. Falta abrir **Custom TCP 8000 → 0.0.0.0/0** en el Security Group de la EC2 (consola AWS). El `localhost` de la VM ya funciona.
+3. **App móvil**: `DEFAULT_API_URL` y el placeholder de ⚙️ ahora apuntan a `http://54.227.194.211:8000`. `npm install` (879 paquetes) + `npx expo start --lan` corriendo en `exp://192.168.1.2:8081` (revisar IP actual con `ipconfig`; el celular debe estar en la misma Wi‑Fi).
+4. **Seguridad**: `key-huevos.pem` quedó dentro del repo pero **`.gitignore` ahora excluye `*.pem`** — no se debe commitear la llave.
+5. **Scripts mejorados**: `scripts/deploy_remote.sh` v2 usa `uv` + Python 3.12 y `unzip` ordenado; `scripts/deploy_local.ps1` versiona el push. Ambos quedaron validados en esta ejecución (excepto el paso público de AWS).
+
+### Upgrade a Expo SDK 57 (2026-09-23, por el Expo Go del celular)
+
+El Expo Go del teléfono ya venía en **SDK 57** y el proyecto en **52** (el QR daba "Project is incompatible"). Se actualizó el proyecto:
+
+- `expo` `^52` → `~57.0.24`; `react` 18.3.1 → **19.2.3**; `react-native` 0.76.5 → **0.86.3**.
+- Modulos sincronizados vía `npx expo install --fix` (fresh `node_modules`, ya que quedaban residuos de SDK 52): `expo-camera ~57.0.5`, `expo-image-picker ~57.0.19`, `@expo/vector-icons ^15.0.2`, `@react-native-async-storage/async-storage 2.2.0`, `expo-asset ~57.0.18`.
+- `app.json`: se quitó el campo `splash` (ya no válido en el schema de SDK 57) y se migró al plugin **`expo-splash-screen`** con `backgroundColor #F4EBDD`; se agregaron plugins `expo-font` (peer de vector-icons) y `expo-splash-screen`.
+- `npx expo-doctor`: **21/21 checks OK**.
+- Bundle Android validado compila: `GET /node_modules/expo/AppEntry.bundle?platform=android` → **HTTP 200 (~4.9 MB dev)** sin errores. En SDK 57 la ruta del bundle ya no es `index.bundle` sino `node_modules/expo/AppEntry.bundle`.
+- El `App.js` no requirió cambios de código: CameraView, ImagePicker, AsyncStorage y RN primitives siguen iguales.
 
 ## Objetivo
 
@@ -190,6 +251,7 @@ Estos comandos todavía no se han ejecutado.
 | Área | Estado |
 |---|---|
 | Notebook escrito (23 celdas, 3 modelos, augmentation, pip install) | Hecho, pendiente de ejecución completa en Colab |
+| 🔴 Reentrenar con fotos completas + datasets múltiples (`scripts/reentrenar_huevos_colab.py`) | **PENDIENTE — ejecutar en Colab** |
 | Fuente y licencia del dataset | Documentadas |
 | GPU y Roboflow | Escrito, falta probar |
 | Preprocesamiento | Escrito, falta validar rutas reales |
@@ -199,20 +261,17 @@ Estos comandos todavía no se han ejecutado.
 | Selección del mejor modelo | Escrito (3 modelos, criterio recall crack), falta ejecutar |
 | API FastAPI | Escrita y con 6 tests pasando |
 | Frontend Expo (cámara en vivo + foto + galería) | Escrito |
-| Deploy AWS (EC2, IP elástica, puerto 8000, systemd) | Documentado, falta ejecutar |
-| Conexión con modelo real | Pendiente (requiere ejecutar Colab) |
-| Prueba desde celular contra AWS | Pendiente |
+| Deploy AWS (EC2, IP elástica, puerto 8000, systemd) | Hecho (instancia real pequeña, ver registro arriba) |
+| Conexión con modelo real | Pendiente (requiere ejecutar reentrenamiento) |
+| Prueba desde celular contra AWS | Pendiente (puerto 8000 público: revisar Security Group) |
 | Detector automático de huevo (YOLO) | Pendiente opcional |
 | `.gitignore` y exclusión de `.opencode/` | Hecho |
 | GitHub | Pendiente |
 
 ## Próximo orden recomendado
 
-1. Abrir el notebook en Colab con GPU T4 y ejecutarlo de principio a fin (API key de Roboflow al llegar a la celda 4).
-2. Confirmar el modelo ganador y `egg_quality_models.zip` en Drive.
-3. Crear la EC2 en AWS (Ubuntu, t3.medium) + IP elástica + puerto 8000 abierto (docs/06-deploy-vm.md).
-4. Subir el zip a la VM (`scp`), instalar dependencias de `api/` y dejar `uvicorn` con systemd.
-5. Verificar `http://IP_ELASTICA:8000/health` desde el celular.
-6. Conectar Expo Go desde el celular apuntando a la IP elástica (botón ⚙️ en la app).
-7. Probar cámara en vivo, foto y galería; corregir problemas de red, permisos o formato.
-8. Revisar secretos y subir la primera versión a GitHub.
+1. **🔴 Reentrenar el modelo** ejecutando `scripts/reentrenar_huevos_colab.py` en Colab con GPU T4 (fotos completas + datasets múltiples). Ver "PENDIENTE PRIORITARIO" arriba.
+2. Descargar el `mejor_mobilenet.keras` de Drive y desplegarlo en la VM de AWS (subir `.keras` / `deploy_local.ps1`).
+3. Verificar el puerto 8000 público (Security Group → Custom TCP 8000 → 0.0.0.0/0) y probar `http://54.227.194.211:8000/health` desde el celular.
+4. Re-probar en el celular con un huevo roto real para confirmar la mejora (cámara en vivo, foto y galería).
+5. Revisar secretos y subir la primera versión a GitHub.

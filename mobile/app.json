@@ -5,9 +5,6 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "splash": {
-      "backgroundColor": "#F4EBDD"
-    },
     "ios": {
       "supportsTablet": true
     },
@@ -22,6 +19,14 @@
         "expo-camera",
         {
           "cameraPermission": "Egg Quality usa la cámara para revisar el estado de los huevos."
+        }
+      ],
+"expo-asset",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F4EBDD"
         }
       ]
     ]

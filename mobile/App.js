@@ -8,9 +8,9 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 
-// Sustituye esta IP por la IP local de la máquina donde corra FastAPI.
+// Sustituye esta IP por la IP donde corra FastAPI (elástica de AWS).
 // También se puede cambiar desde la app: botón '⚙️ Configurar API'.
-const DEFAULT_API_URL = 'http://192.168.1.100:8000';
+const DEFAULT_API_URL = 'http://54.227.194.211:8000';
 const URL_STORAGE_KEY = 'egg_quality_api_url';
 const HISTORY_STORAGE_KEY = 'egg_quality_history';
 
@@ -85,13 +85,26 @@ export default function App() {
     try {
       const body = new FormData();
       body.append('file', { uri: image.uri, name: 'egg.jpg', type: 'image/jpeg' });
-      const response = await fetch(`${apiUrl}/predict`, { method: 'POST', body });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || 'No se pudo analizar la imagen.');
-      setResult(data);
+
+      // En React Native, `fetch` a veces envía mal el multipart y FastAPI
+      // responde "Unsupported form data implementation". XMLHttpRequest
+      // serializa correctamente el FormData con su boundary.
+      const result = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${apiUrl}/predict`);
+        xhr.onload = () => {
+          let data;
+          try { data = JSON.parse(xhr.responseText); } catch { data = {}; }
+          if (xhr.status >= 200 && xhr.status < 300) resolve(data);
+          else reject(new Error(data.detail || `Error ${xhr.status}: No se pudo analizar la imagen.`));
+        };
+        xhr.onerror = () => reject(new Error('No se pudo conectar con el servidor. Revisa la IP configurada.'));
+        xhr.send(body);
+      });
+      setResult(result);
       pushHistory({
-        label: data.label,
-        confidence: data.confidence,
+        label: result.label,
+        confidence: result.confidence,
         at: new Date().toLocaleString(),
       });
     } catch (requestError) {
@@ -177,7 +190,7 @@ export default function App() {
                 style={styles.input}
                 value={configDraft}
                 onChangeText={setConfigDraft}
-                placeholder="http://192.168.1.100:8000"
+                placeholder="http://54.227.194.211:8000"
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="url"

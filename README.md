@@ -49,6 +49,7 @@ API FastAPI <----- Aplicación Expo Go en el celular
 ## Componentes del repositorio
 
 - `clasificador_huevos_colab.ipynb`: notebook educativo para descarga, preprocesamiento, entrenamiento (MLP vs CNN vs MobileNetV2 con transfer learning), evaluación y exportación del modelo. **Flujo completo (23 celdas)**, con `pip install` al inicio y listo para Colab con GPU.
+- `scripts/reentrenar_huevos_colab.py`: script para Colab que **combina varios datasets de Roboflow** y entrena con **fotos completas** (no crops), para que el modelo coincida con lo que envía la app. Exporta el mejor modelo (CNN o MobileNetV2) por recall de `crack`.
 - `api/`: servidor FastAPI que carga el modelo y recibe imágenes para clasificación.
 - `mobile/`: aplicación Expo/React Native con cámara en vivo (preview continuo + captura), foto, galería, vista previa y resultado.
 - `docs/`: documentación técnica — visión general, arquitectura, dataset, preprocesamiento (incluye filtro **Sobel** creativo), modelos (MLP/CNN/**transfer learning**) y deploy en **AWS EC2 con IP elástica**.
@@ -77,7 +78,7 @@ El esqueleto del MVP fue fortalecido: el notebook quedó con flujo completo (21 
 
 ## Conectar la app al celular (vía AWS)
 
-La ruta de deploy completa está en `docs/06-deploy-vm.md`. Resumen:
+La ruta de deploy completa está en `docs/06-deploy-vm.md`. La EC2 ya existe y su **IP elástica es `54.227.194.211`**. Resumen:
 
 1. Ejecuta el notebook en Colab (GPU T4): entrena MLP, CNN y MobileNetV2, elige el mejor por recall de `crack` y guarda `egg_quality_models.zip` en Drive.
 2. Descarga el zip de Drive y cópialo a la VM EC2 en AWS (`scp`).
@@ -88,11 +89,19 @@ MODEL_PATH=/home/ubuntu/egg_quality_models/mejor_cnn.keras \
 uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
-4. Security group: abre el **puerto 8000** (Custom TCP → 0.0.0.0/0).
-5. Asocia una **IP elástica** a la instancia (la IP no cambia al apagar/encender).
-6. En la app (botón ⚙️ Configurar API) usa `http://TU_IP_ELASTICA:8000`.
+O en un solo comando desde tu PC (PowerShell):
 
-Con eso la app funciona desde cualquier red: la IP elástica es pública y el puerto está abierto. Verifica primero `http://TU_IP_ELASTICA:8000/health` desde el navegador del celular.
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\deploy_local.ps1 -Pem C:\ruta\llave.pem -Zip .\egg_quality_models.zip -ModelFile mejor_cnn.keras
+```
+
+4. Security group: abre el **puerto 8000** (Custom TCP → 0.0.0.0/0) — ya está abierto.
+5. Asocia una **IP elástica** a la instancia (la IP no cambia al apagar/encender) — ya está asociada: `54.227.194.211`.
+6. En la app (botón ⚙️ Configurar API) usa `http://54.227.194.211:8000`.
+
+Con eso la app funciona desde cualquier red: la IP elástica es pública y el puerto está abierto. Verifica primero `http://54.227.194.211:8000/health` desde el navegador del celular.
+
+> **Nota del modelo**: los números reales del notebook favorecen a **MobileNetV2** (92% accuracy, recall crack 89%, balanceado) sobre la CNN (64% accuracy, predice crack casi siempre). Si la demo se siente "todo crack", reexporta MobileNetV2 con el criterio corregido de la celda 22 y despliega con `-ModelFile mejor_mobilenet.keras`.
 
 ## Flujo de trabajo
 
@@ -106,9 +115,9 @@ Con eso la app funciona desde cualquier red: la IP elástica es pública y el pu
 
 ## Alcance y limitaciones actuales
 
-El modelo fue diseñado con imágenes recortadas por bounding box. Por eso, en la primera versión la foto debe mostrar un huevo bien encuadrado. La detección automática del huevo antes de clasificarlo queda como una mejora posterior.
+La primera versión entrenaba con imágenes recortadas por bounding box (crops), mientras la app enviaba la foto completa; ese desajuste degradaba la precisión con huevos reales. El script `scripts/reentrenar_huevos_colab.py` corrige esto entrenando con **fotos completas** (como las que manda la app) y ampliando el dataset con más fuentes de Roboflow.
 
-La predicción es una estimación basada en imágenes y no constituye un diagnóstico definitivo de calidad o seguridad alimentaria.
+Aun así, la predicción es una estimación basada en imágenes y no constituye un diagnóstico definitivo de calidad o seguridad alimentaria.
 
 ## Autores
 
