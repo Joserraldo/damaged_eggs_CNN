@@ -72,6 +72,20 @@ API FastAPI <----- Aplicación Expo Go en el celular
 
 Detalles en `docs/05-creatividad.md`.
 
+## Evidencias del modelo entrenado
+
+Fotos reales tomadas con el modelo ya desplegado y en funcionamiento, mostrando la clasificación de huevos en estado `good` y `crack`. El reporte completo del proyecto está disponible en [`Reporte_Proyecto_Clasificacion_Huevos_Santiago_Jose_Actualizado.pdf`](Reporte_Proyecto_Clasificacion_Huevos_Santiago_Jose_Actualizado.pdf).
+
+| Huevo bueno (`good`) | Huevo bueno (`good`) | Huevo bueno (`good`) |
+|:---:|:---:|:---:|
+| <img src="evidencias/1-good-good.jpeg" width="220"> | <img src="evidencias/3-good-good.jpeg" width="220"> | <img src="evidencias/5-good-good.jpeg" width="220"> |
+
+| Huevo agrietado (`crack`) | Huevo agrietado (`crack`) | Huevo agrietado (`crack`) |
+|:---:|:---:|:---:|
+| <img src="evidencias/2-cracked-cracked.jpeg" width="220"> | <img src="evidencias/4-cracked-cracked.jpeg" width="220"> | <img src="evidencias/6-cracked-cracked.jpeg" width="220"> |
+
+El resto de las capturas se encuentra en la carpeta [`evidencias/`](evidencias/).
+
 ## Estado actual
 
 El esqueleto del MVP fue fortalecido: el notebook quedó con flujo completo (21 celdas, listo para ejecutar en Colab), la documentación técnica (`docs/`) cubre arquitectura, dataset, preprocesamiento y creatividad, y la API + app móvil están preparadas para comunicarse. El siguiente hito es ejecutar el entrenamiento en Colab, obtener el modelo final y validar el flujo completo desde el celular.
